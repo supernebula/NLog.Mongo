@@ -184,6 +184,7 @@ namespace NLog.Mongo
 
         private BsonDocument CreateDocument(LogEventInfo logEvent)
         {
+
             var document = new BsonDocument();
             if (IncludeDefaults || Fields.Count == 0)
                 AddDefaults(document, logEvent);
@@ -235,14 +236,29 @@ namespace NLog.Mongo
             var properties = logEvent.Properties ?? Enumerable.Empty<KeyValuePair<object, object>>();
             foreach (var property in properties)
             {
+
                 if (property.Key == null || property.Value == null)
                     continue;
 
                 string key = Convert.ToString(property.Key, CultureInfo.InvariantCulture);
                 string value = Convert.ToString(property.Value, CultureInfo.InvariantCulture);
 
+
+
                 if (!string.IsNullOrEmpty(value))
-                    propertiesDocument[key] = new BsonString(value);
+                {
+                    var field = Fields.SingleOrDefault(e => e.Name.Equals(key, StringComparison.CurrentCultureIgnoreCase));
+                    if (field != null)
+                    {
+                        var bsonValue = ConvertBsonValue(field, value);
+                        document.Add(key, new BsonString(key));
+                        document[key] = bsonValue;
+                    }
+                    else
+
+                        propertiesDocument[key] = new BsonString(value);
+                }
+
             }
 
             if (propertiesDocument.ElementCount > 0)
@@ -292,33 +308,40 @@ namespace NLog.Mongo
 
             value = value.Trim();
 
-            if (string.IsNullOrEmpty(field.BsonType)
-                || string.Equals(field.BsonType, "String", StringComparison.OrdinalIgnoreCase))
-                return new BsonString(value);
+            return ConvertBsonValue(field, value);
+
+
+
+        }
+
+        private BsonValue ConvertBsonValue(MongoField field, string valueStr)
+        {
+            if (string.IsNullOrEmpty(field.BsonType) || string.Equals(field.BsonType, "String", StringComparison.OrdinalIgnoreCase))
+                return new BsonString(valueStr);
 
 
             BsonValue bsonValue;
             if (string.Equals(field.BsonType, "Boolean", StringComparison.OrdinalIgnoreCase)
-                && MongoConvert.TryBoolean(value, out bsonValue))
+                && MongoConvert.TryBoolean(valueStr, out bsonValue))
                 return bsonValue;
 
             if (string.Equals(field.BsonType, "DateTime", StringComparison.OrdinalIgnoreCase)
-                && MongoConvert.TryDateTime(value, out bsonValue))
+                && MongoConvert.TryDateTime(valueStr, out bsonValue))
                 return bsonValue;
 
             if (string.Equals(field.BsonType, "Double", StringComparison.OrdinalIgnoreCase)
-                && MongoConvert.TryDouble(value, out bsonValue))
+                && MongoConvert.TryDouble(valueStr, out bsonValue))
                 return bsonValue;
 
             if (string.Equals(field.BsonType, "Int32", StringComparison.OrdinalIgnoreCase)
-                && MongoConvert.TryInt32(value, out bsonValue))
+                && MongoConvert.TryInt32(valueStr, out bsonValue))
                 return bsonValue;
 
             if (string.Equals(field.BsonType, "Int64", StringComparison.OrdinalIgnoreCase)
-                && MongoConvert.TryInt64(value, out bsonValue))
+                && MongoConvert.TryInt64(valueStr, out bsonValue))
                 return bsonValue;
 
-            return new BsonString(value);
+            return new BsonString(valueStr);
         }
 
         private IMongoCollection<BsonDocument> GetCollection()
